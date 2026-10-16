@@ -1,5 +1,7 @@
 This is a Kotlin Multiplatform project targeting Android, iOS, Web, Desktop (JVM), Server.
 
+See [Development](DEVELOPMENT.md) for build prerequisites and CI checks.
+
 ### Features
 
 - Search for places with OpenStreetMap Nominatim and show results on the map.
