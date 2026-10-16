@@ -8,6 +8,7 @@ kotlin {
 
 dependencies {
     testImplementation(libs.appium.java.client)
+    testImplementation(libs.selenium.support)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlin.test)
     testImplementation(libs.testcontainers)
