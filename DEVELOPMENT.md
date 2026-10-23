@@ -16,3 +16,10 @@ map camera, location puck, and offline APIs (see [PR #18](https://github.com/sto
 Dependabot permits patch updates but ignores minor and major updates for this
 dependency. Remove that exception in `.github/dependabot.yml` when the API migration
 is complete and verified.
+
+JS, Wasm, and Kotlin web tooling dependency installation share a Gradle build
+service with one concurrent user. Yarn Classic's network mutex can return success
+without producing `build/wasm/yarn.lock` when installations overlap on Windows.
+The service serializes only dependency installation; compilation and tests can
+still run in parallel, and lockfile validation remains enabled. Remove it once
+the bundled package manager reliably handles concurrent installations.
