@@ -23,40 +23,42 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import bailongmap.app.shared.generated.resources.Res
 import bailongmap.app.shared.generated.resources.ic_delete
 import bailongmap.app.shared.generated.resources.ic_download
 import bailongmap.app.shared.generated.resources.ic_pause
 import bailongmap.app.shared.generated.resources.ic_play
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
 import org.maplibre.compose.offline.DownloadProgress
 import org.maplibre.compose.offline.DownloadStatus
-import org.maplibre.compose.offline.OfflineManager
 import org.maplibre.compose.offline.OfflinePack
+import org.maplibre.compose.offline.OfflineStorage
+import org.maplibre.compose.offline.OfflineStorageState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OfflineCacheSheet(
-    offlineManager: OfflineManager,
+    offlineStorage: OfflineStorage,
     currentZoom: Double,
     isCreatingPack: Boolean,
     sheetState: SheetState,
     onDismiss: () -> Unit,
     onDownloadVisibleRegion: () -> Unit,
-    onError: (String) -> Unit,
+    onClearCache: () -> Unit,
+    onPause: (OfflinePack) -> Unit,
+    onResume: (OfflinePack) -> Unit,
+    onDelete: (OfflinePack) -> Unit,
 ) {
-    val coroutineScope = rememberCoroutineScope()
-    val packs by offlineManager.packs.collectAsState()
-    val canDownload = currentZoom >= 8.0 && !isCreatingPack
+    val storageState by offlineStorage.state.collectAsStateWithLifecycle()
+    val packs = (storageState as? OfflineStorageState.Ready)?.packs.orEmpty()
+    val canDownload = currentZoom >= 8.0 && !isCreatingPack && storageState is OfflineStorageState.Ready
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -91,12 +93,8 @@ fun OfflineCacheSheet(
                     Text(if (isCreatingPack) "创建中" else "下载当前区域")
                 }
                 OutlinedButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            runCatching { offlineManager.clearAmbientCache() }
-                                .onFailure { onError("清理缓存失败") }
-                        }
-                    },
+                    onClick = onClearCache,
+                    enabled = storageState is OfflineStorageState.Ready,
                 ) {
                     Text("清理缓存")
                 }
@@ -114,7 +112,12 @@ fun OfflineCacheSheet(
 
             if (packs.isEmpty()) {
                 Text(
-                    text = "暂无离线区域",
+                    text = when (storageState) {
+                        OfflineStorageState.Loading -> "正在加载离线区域"
+                        is OfflineStorageState.Failed -> "离线存储初始化失败"
+                        is OfflineStorageState.Ready -> "暂无离线区域"
+                        else -> "离线存储暂不可用"
+                    },
                     modifier = Modifier.padding(vertical = 12.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -127,14 +130,9 @@ fun OfflineCacheSheet(
                     items(packs.toList(), key = { it.hashCode() }) { pack ->
                         OfflinePackRow(
                             pack = pack,
-                            onPause = { offlineManager.pause(pack) },
-                            onResume = { offlineManager.resume(pack) },
-                            onDelete = {
-                                coroutineScope.launch {
-                                    runCatching { offlineManager.delete(pack) }
-                                        .onFailure { onError("删除离线区域失败") }
-                                }
-                            },
+                            onPause = { onPause(pack) },
+                            onResume = { onResume(pack) },
+                            onDelete = { onDelete(pack) },
                         )
                     }
                 }
@@ -150,8 +148,8 @@ private fun OfflinePackRow(
     onResume: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val progress by pack.downloadProgress.collectAsState()
-    val metadata by pack.metadata.collectAsState()
+    val progress by pack.downloadProgress.collectAsStateWithLifecycle()
+    val metadata by pack.metadata.collectAsStateWithLifecycle()
     val healthy = progress as? DownloadProgress.Healthy
     val fraction = healthy?.progressFraction()
     val isDownloading = healthy?.status == DownloadStatus.Downloading
@@ -217,6 +215,7 @@ private fun DownloadProgress.summaryText(): String =
                 DownloadStatus.Paused -> "已暂停"
                 DownloadStatus.Downloading -> "下载中"
                 DownloadStatus.Complete -> "已完成"
+                else -> "状态未知"
             }
             val countText =
                 if (requiredResourceCount > 0L) "$completedResourceCount / $requiredResourceCount"
@@ -225,7 +224,8 @@ private fun DownloadProgress.summaryText(): String =
         }
         is DownloadProgress.Error -> "错误：$message"
         is DownloadProgress.TileLimitExceeded -> "超过离线瓦片上限：$limit"
-        DownloadProgress.Unknown -> "准备中"
+        DownloadProgress.NotReported -> "准备中"
+        else -> "状态未知"
     }
 
 private fun Long.formatBytes(): String =

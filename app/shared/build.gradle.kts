@@ -75,6 +75,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutinesTest)
         }
 //        jsMain.dependencies {
 //            implementation(libs.wrappers.browser)

@@ -11,8 +11,12 @@ To verify Appium test compilation without a device or Appium server, run
 `./gradlew :appiumTests:compileTestKotlin --no-daemon`. Running device tests requires
 Appium server 3 or newer for Appium Java Client 11.
 
-MapLibre Compose remains on 0.17.x because newer releases require migrating the
-map camera, location puck, and offline APIs (see [PR #18](https://github.com/storytellerF/BailongMap/pull/18)).
+MapLibre Compose uses 0.20.0. Camera commands use `CameraUpdate` and `CameraFit`,
+and the location marker uses `LocationIndicatorLayer`. Offline UI observes
+`OfflineStorage.state` and distinguishes loading, ready, and failed initialization.
+`OfflineHost` owns offline actions on an injected serial background dispatcher;
+the screen closes it on disposal and collects its state and effects with its lifecycle.
+Offline storage is a native-only API; the shared UI currently builds for Android.
 
 JS, Wasm, and Kotlin web tooling dependency installation share a Gradle build
 service with one concurrent user. Yarn Classic's network mutex can return success
