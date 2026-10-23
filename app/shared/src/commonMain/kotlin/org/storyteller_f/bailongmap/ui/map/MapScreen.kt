@@ -3,30 +3,24 @@ package org.storyteller_f.bailongmap.ui.map
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.DropdownMenu
-import org.jetbrains.compose.resources.painterResource
-import bailongmap.app.shared.generated.resources.Res
-import bailongmap.app.shared.generated.resources.ic_check
-import bailongmap.app.shared.generated.resources.ic_location_on
-import bailongmap.app.shared.generated.resources.ic_map
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -38,25 +32,34 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import bailongmap.app.shared.generated.resources.Res
+import bailongmap.app.shared.generated.resources.ic_check
 import bailongmap.app.shared.generated.resources.ic_layers
+import bailongmap.app.shared.generated.resources.ic_location_on
+import bailongmap.app.shared.generated.resources.ic_map
 import bailongmap.app.shared.generated.resources.ic_settings
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.jetbrains.compose.resources.painterResource
+import org.maplibre.compose.camera.CameraFit
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.expressions.dsl.const
-import org.maplibre.compose.layers.CircleLayer
-import org.maplibre.compose.layers.FillLayer
-import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.expressions.value.LineCap
 import org.maplibre.compose.expressions.value.LineJoin
 import org.maplibre.compose.interaction.ClickResult
 import org.maplibre.compose.interaction.MapInteractions
-import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.layers.CircleLayer
+import org.maplibre.compose.layers.FillLayer
+import org.maplibre.compose.layers.LineLayer
+import org.maplibre.compose.layers.LocationIndicatorLayer
 import org.maplibre.compose.location.rememberDefaultHeadingProvider
 import org.maplibre.compose.location.rememberDefaultLocationProvider
 import org.maplibre.compose.location.rememberLocationState
@@ -65,16 +68,18 @@ import org.maplibre.compose.map.LocalMapState
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.rememberMapState
 import org.maplibre.compose.offline.OfflinePackDefinition
+import org.maplibre.compose.offline.OfflineStorageState
+import org.maplibre.compose.offline.offlineStorage
 import org.maplibre.compose.offline.rememberOfflinePacksSource
 import org.maplibre.compose.sources.GeoJsonData
-import org.maplibre.compose.sources.GeoJsonOptions
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.util.DpPadding
+import org.maplibre.spatialk.geojson.BoundingBox
 import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.spatialk.geojson.Feature.Companion.getStringProperty
 import org.maplibre.spatialk.geojson.FeatureCollection
 import org.maplibre.spatialk.geojson.Geometry
-import org.maplibre.spatialk.geojson.BoundingBox
 import org.maplibre.spatialk.geojson.LineString
 import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Position
@@ -85,7 +90,10 @@ import org.storyteller_f.bailongmap.data.model.RoutePoint
 import org.storyteller_f.bailongmap.data.model.TravelMode
 import org.storyteller_f.bailongmap.ui.navigation.JourneyNavigationCard
 import org.storyteller_f.bailongmap.ui.navigation.JourneyOptionsCard
+import org.storyteller_f.bailongmap.ui.offline.MaplibreOfflineOperations
 import org.storyteller_f.bailongmap.ui.offline.OfflineCacheSheet
+import org.storyteller_f.bailongmap.ui.offline.OfflineDispatchers
+import org.storyteller_f.bailongmap.ui.offline.OfflineHost
 import org.storyteller_f.bailongmap.ui.place.PlaceDetailSheet
 import org.storyteller_f.bailongmap.ui.search.SearchBarUi
 import org.storyteller_f.bailongmap.ui.settings.MapSettingsSheet
@@ -106,8 +114,9 @@ fun MapScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val offlineSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val offlineManager = DefaultMapRuntime.instance.offlineManager
-    val offlinePacks by offlineManager.packs.collectAsState()
+    val offlineStorage = DefaultMapRuntime.instance.offlineStorage
+    val offlineState by offlineStorage.state.collectAsStateWithLifecycle()
+    val offlinePacks = (offlineState as? OfflineStorageState.Ready)?.packs.orEmpty()
     val pixelRatio = LocalDensity.current.density
     val locationState = if (hasLocationPermission) {
         val locationProvider = rememberDefaultLocationProvider()
@@ -126,12 +135,24 @@ fun MapScreen(
     var showStyleMenu by remember { mutableStateOf(false) }
     var showOfflineSheet by remember { mutableStateOf(false) }
     var showSettingsSheet by remember { mutableStateOf(false) }
-    var isCreatingOfflinePack by remember { mutableStateOf(false) }
+    val offlineHost = remember(offlineStorage) {
+        OfflineHost(MaplibreOfflineOperations(offlineStorage), OfflineDispatchers.coordination)
+    }
+    val isCreatingOfflinePack by offlineHost.isCreatingPack.collectAsStateWithLifecycle()
+    DisposableEffect(offlineHost) {
+        onDispose { offlineHost.close() }
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(offlineHost, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            offlineHost.effects.collect(viewModel::showError)
+        }
+    }
     val styleUrl = offlineTestStyleUrl ?: MAP_STYLES[uiState.styleIndex].second
     val mapState = rememberMapState(
         baseStyle = BaseStyle.Uri(styleUrl),
         initialCameraPosition = CameraPosition(
-            target = Position(latitude = 39.9042, longitude = 116.4074),
+            center = Position(latitude = 39.9042, longitude = 116.4074),
             zoom = 10.0,
         ),
     ) {
@@ -154,7 +175,6 @@ fun MapScreen(
                     }
                     val routeSource = rememberGeoJsonSource(
                         data = GeoJsonData.Features(routeCollection),
-                        options = GeoJsonOptions(synchronousUpdate = true),
                     )
                     LineLayer(
                         id = "journey-leg-$index-casing",
@@ -183,7 +203,6 @@ fun MapScreen(
         }
         val resultsSource = rememberGeoJsonSource(
             data = GeoJsonData.Features(resultsCollection),
-            options = GeoJsonOptions(synchronousUpdate = true),
         )
 
         if (uiState.showSearchMarkers && uiState.searchResults.isNotEmpty()) {
@@ -200,11 +219,11 @@ fun MapScreen(
                     if (place != null) {
                         viewModel.onPlaceSelected(place)
                         coroutineScope.launch {
-                            currentMapState.animateCameraPosition(
+                            currentMapState.animateCamera(
                                 CameraPosition(
-                                    target = Position(latitude = place.lat, longitude = place.lon),
+                                    center = Position(latitude = place.lat, longitude = place.lon),
                                     zoom = maxOf(currentMapState.cameraPosition.zoom, 14.0),
-                                )
+                                ).toCameraUpdate()
                             )
                         }
                     }
@@ -215,8 +234,8 @@ fun MapScreen(
 
         locationState?.let { state ->
             if (uiState.showUserLocation) {
-                LocationPuck(
-                    idPrefix = "user",
+                LocationIndicatorLayer(
+                    id = "user-location",
                     locationState = state,
                 )
             }
@@ -230,11 +249,11 @@ fun MapScreen(
     LaunchedEffect(openedPlace?.id) {
         val place = openedPlace ?: return@LaunchedEffect
         viewModel.onPlaceSelected(place)
-        mapState.animateCameraPosition(
+        mapState.animateCamera(
             CameraPosition(
-                target = Position(latitude = place.lat, longitude = place.lon),
+                center = Position(latitude = place.lat, longitude = place.lon),
                 zoom = 15.0,
-            )
+            ).toCameraUpdate()
         )
         onOpenedPlaceConsumed()
     }
@@ -243,7 +262,7 @@ fun MapScreen(
         uiState.selectedJourneyPlan?.let { plan ->
             mapState.animateCameraToBounds(
                 boundingBox = plan.boundingBox(),
-                padding = PaddingValues(48.dp),
+                fit = CameraFit(fitPadding = DpPadding(48.dp, 48.dp, 48.dp, 48.dp)),
             )
         }
     }
@@ -319,11 +338,11 @@ fun MapScreen(
                 onResultClick = { place ->
                     viewModel.onPlaceSelected(place)
                     coroutineScope.launch {
-                        mapState.animateCameraPosition(
+                        mapState.animateCamera(
                             CameraPosition(
-                                target = Position(latitude = place.lat, longitude = place.lon),
+                                center = Position(latitude = place.lat, longitude = place.lon),
                                 zoom = 14.0,
-                            )
+                            ).toCameraUpdate()
                         )
                     }
                 },
@@ -387,7 +406,7 @@ fun MapScreen(
                         coroutineScope.launch {
                             val pos = locationState?.lastLocation?.position
                             if (pos != null) {
-                                mapState.animateCameraPosition(CameraPosition(target = pos, zoom = 15.0))
+                                mapState.animateCamera(CameraPosition(center = pos, zoom = 15.0).toCameraUpdate())
                             }
                         }
                     } else {
@@ -477,33 +496,31 @@ fun MapScreen(
 
     if (showOfflineSheet) {
         OfflineCacheSheet(
-            offlineManager = offlineManager,
+            offlineStorage = offlineStorage,
             currentZoom = mapState.cameraPosition.zoom,
             isCreatingPack = isCreatingOfflinePack,
             sheetState = offlineSheetState,
             onDismiss = { showOfflineSheet = false },
-            onError = viewModel::showError,
+            onClearCache = { offlineHost.clearCache() },
+            onPause = { offlineHost.pause(it) },
+            onResume = { offlineHost.resume(it) },
+            onDelete = { offlineHost.delete(it) },
             onDownloadVisibleRegion = {
-                coroutineScope.launch {
-                    isCreatingOfflinePack = true
-                    runCatching {
-                        val zoom = mapState.cameraPosition.zoom.toInt()
-                        val bounds = checkNotNull(mapState.viewport).visibleBounds.toBoundingBox()
-                        val pack = offlineManager.create(
-                            definition = OfflinePackDefinition.TilePyramid(
-                                styleUrl = styleUrl,
-                                bounds = bounds,
-                                pixelRatio = pixelRatio,
-                                minZoom = (zoom - 2).coerceAtLeast(0),
-                                maxZoom = (zoom + 2).coerceAtMost(16),
-                            ),
-                            metadata = "离线区域 ${offlinePacks.size + 1}".encodeToByteArray(),
-                        )
-                        offlineManager.resume(pack)
-                    }.onFailure {
-                        viewModel.showError("创建离线区域失败")
-                    }
-                    isCreatingOfflinePack = false
+                val viewport = mapState.viewport
+                if (viewport == null) {
+                    viewModel.showError("地图尚未就绪，请稍后重试")
+                } else {
+                    val zoom = mapState.cameraPosition.zoom.toInt().coerceIn(0, 16)
+                    offlineHost.create(
+                        definition = OfflinePackDefinition.TilePyramid(
+                            styleUrl = styleUrl,
+                            bounds = viewport.visibleBounds.toBoundingBox(),
+                            pixelRatio = pixelRatio,
+                            minZoom = (zoom - 2).coerceAtLeast(0).toDouble(),
+                            maxZoom = (zoom + 2).coerceAtMost(16).toDouble(),
+                        ),
+                        title = "离线区域 ${offlinePacks.size + 1}",
+                    )
                 }
             },
         )
@@ -512,14 +529,13 @@ fun MapScreen(
     if (showSettingsSheet) {
         MapSettingsSheet(
             uiState = uiState,
-            offlineManager = offlineManager,
+            onClearCache = { offlineHost.clearCache() },
             sheetState = settingsSheetState,
             onDismiss = { showSettingsSheet = false },
             onStyleChange = viewModel::onStyleChange,
             onShowOfflineRegionsChange = viewModel::onShowOfflineRegionsChange,
             onShowSearchMarkersChange = viewModel::onShowSearchMarkersChange,
             onShowUserLocationChange = viewModel::onShowUserLocationChange,
-            onError = viewModel::showError,
         )
     }
 }

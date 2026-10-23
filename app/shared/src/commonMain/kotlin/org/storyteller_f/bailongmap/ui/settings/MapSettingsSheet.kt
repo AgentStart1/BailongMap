@@ -20,13 +20,10 @@ import androidx.compose.material3.SheetState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
-import org.maplibre.compose.offline.OfflineManager
 import org.storyteller_f.bailongmap.ui.map.MAP_STYLES
 import org.storyteller_f.bailongmap.ui.map.MapUiState
 
@@ -34,17 +31,14 @@ import org.storyteller_f.bailongmap.ui.map.MapUiState
 @Composable
 fun MapSettingsSheet(
     uiState: MapUiState,
-    offlineManager: OfflineManager,
+    onClearCache: () -> Unit,
     sheetState: SheetState,
     onDismiss: () -> Unit,
     onStyleChange: (Int) -> Unit,
     onShowOfflineRegionsChange: (Boolean) -> Unit,
     onShowSearchMarkersChange: (Boolean) -> Unit,
     onShowUserLocationChange: (Boolean) -> Unit,
-    onError: (String) -> Unit,
 ) {
-    val coroutineScope = rememberCoroutineScope()
-
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -100,12 +94,7 @@ fun MapSettingsSheet(
 
             SectionTitle("缓存")
             OutlinedButton(
-                onClick = {
-                    coroutineScope.launch {
-                        runCatching { offlineManager.clearAmbientCache() }
-                            .onFailure { onError("清理缓存失败") }
-                    }
-                },
+                onClick = onClearCache,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text("清理自动缓存")
