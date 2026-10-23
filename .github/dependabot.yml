@@ -4,6 +4,12 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # Remove after migrating the map and offline APIs beyond 0.17.x (PR #18).
+    ignore:
+      - dependency-name: "org.maplibre.compose:maplibre-compose"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
     groups:
       all-dependencies:
         patterns:
