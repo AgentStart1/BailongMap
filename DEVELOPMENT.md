@@ -11,6 +11,20 @@ To verify Appium test compilation without a device or Appium server, run
 `./gradlew :appiumTests:compileTestKotlin --no-daemon`. Running device tests requires
 Appium server 3 or newer for Appium Java Client 11.
 
+With `adb` on `PATH`, a connected Android device, and an Appium server running,
+run `./scripts/appium-test.sh -PappiumTags=navigation` for navigation end-to-end
+tests. The script uses `ANDROID_UDID` when set, otherwise the first connected
+device reported by `adb devices`. It installs the debug APK before running the
+tests and forwards command-line arguments to both Gradle invocations. An install
+failure stops the script; otherwise it returns the test command's exit code.
+The script requires no AI plugin or device-lock helper. AI tooling manages any
+shared-device locking externally.
+
+The navigation test injects mock locations through ADB, selects a three-stage
+walking–subway–bicycle option, advances at transfer points, and restores real
+location afterward. It uses `adb reverse` with local map-style and OpenTripPlanner
+fixtures, so the test does not depend on internet access.
+
 MapLibre Compose uses 0.20.0. Camera commands use `CameraUpdate` and `CameraFit`,
 and the location marker uses `LocationIndicatorLayer`. Offline UI observes
 `OfflineStorage.state` and distinguishes loading, ready, and failed initialization.
