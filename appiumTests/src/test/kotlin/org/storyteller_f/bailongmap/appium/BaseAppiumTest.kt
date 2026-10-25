@@ -39,7 +39,7 @@ abstract class BaseAppiumTest {
             .setPlatformName("Android")
             .setAutomationName("UiAutomator2")
             .setAppPackage(appPackage())
-            .setAppActivity(System.getenv("APP_ACTIVITY") ?: ".MainActivity")
+            .setAppActivity(appActivity())
             .setAutoGrantPermissions(true)
             .setNoReset(true)
 
@@ -109,7 +109,7 @@ abstract class BaseAppiumTest {
             "-d",
             shellQuote(url),
             "-n",
-            "${appPackage()}/.MainActivity",
+            "${appPackage()}/${appActivity()}",
         )
         runAdb(command, "adb deep link failed")
     }
@@ -225,6 +225,9 @@ abstract class BaseAppiumTest {
 
     protected fun appPackage(): String =
         System.getenv("APP_PACKAGE") ?: "org.storyteller_f.bailongmap"
+
+    private fun appActivity(): String =
+        System.getenv("APP_ACTIVITY") ?: ".MainActivity"
 
     private fun clearAppData(pkg: String) {
         val command = mutableListOf(resolveAdbPath())

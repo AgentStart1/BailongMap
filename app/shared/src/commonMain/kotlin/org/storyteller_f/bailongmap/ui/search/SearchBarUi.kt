@@ -80,7 +80,6 @@ fun SearchBarUi(
             LazyColumn {
                 items(results, key = { it.id }) { place ->
                     ListItem(
-                        headlineContent = { Text(place.name) },
                         supportingContent = {
                             Text(
                                 text = place.displayName,
@@ -90,7 +89,9 @@ fun SearchBarUi(
                             )
                         },
                         modifier = Modifier.clickable { onResultClick(place) },
-                    )
+                    ) {
+                        Text(place.name)
+                    }
                     HorizontalDivider()
                 }
             }
