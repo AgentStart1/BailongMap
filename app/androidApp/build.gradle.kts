@@ -20,6 +20,7 @@ kotlin {
 }
 dependencies {
     implementation(projects.app.shared)
+    runtimeOnly(libs.maplibre.compose.runtimeAndroid)
 
     implementation(libs.androidx.activity.compose)
 
