@@ -65,16 +65,7 @@ Use the run button in your IDE's editor gutter, or run tests using Gradle tasks:
 - Android tests: `./gradlew :app:shared:testAndroidHostTest`
 - Server tests: `./gradlew :server:test`
 
-Navigation end-to-end testing requires a connected Android device, a running Appium server, and the
-Android device-lock helper. The test injects mock locations through ADB, selects a three-stage
-walking–subway–bicycle option, automatically advances at transfer points, and restores real
-location afterward. It uses `adb reverse` with local map-style and OpenTripPlanner fixtures, so the
-test does not depend on internet access:
-
-```shell
-appium
-APPIUM_TEST_NAME=navigation ./scripts/appium-test.sh -PappiumTags=navigation
-```
+See [Development](DEVELOPMENT.md) for navigation end-to-end test setup and commands.
 
 ---
 
