@@ -77,6 +77,11 @@ kotlin {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutinesTest)
         }
+        getByName("androidHostTest").dependencies {
+            implementation(libs.robolectric)
+            implementation(libs.compose.uiTestJunit4)
+            implementation(libs.androidx.activity.compose)
+        }
 //        jsMain.dependencies {
 //            implementation(libs.wrappers.browser)
 //        }

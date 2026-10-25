@@ -17,7 +17,6 @@ import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -111,9 +110,9 @@ fun MapScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val offlineSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberMapSheetState()
+    val offlineSheetState = rememberMapSheetState()
+    val settingsSheetState = rememberMapSheetState()
     val offlineStorage = DefaultMapRuntime.instance.offlineStorage
     val offlineState by offlineStorage.state.collectAsStateWithLifecycle()
     val offlinePacks = (offlineState as? OfflineStorageState.Ready)?.packs.orEmpty()
